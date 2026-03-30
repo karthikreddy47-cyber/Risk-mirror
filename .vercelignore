@@ -1,0 +1,6 @@
+backend
+.env
+.git
+node_modules
+*.log
+database

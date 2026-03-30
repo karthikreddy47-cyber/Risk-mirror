@@ -1,8 +1,4 @@
 {
-  "buildCommand": "cd frontend && npm install && npm run build",
-  "outputDirectory": "frontend/dist",
-  "framework": "vite",
-  "env": {
-    "VITE_BACKEND_URL": "@vite_backend_url"
-  }
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist"
 }
