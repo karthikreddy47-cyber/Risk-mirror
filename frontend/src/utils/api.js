@@ -1,7 +1,10 @@
 import axios from 'axios';
 
+// Use environment variable for backend URL, fallback to relative path for local dev
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '/api';
+
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: BACKEND_URL,
   timeout: 15000,
 });
 
