@@ -1,0 +1,16 @@
+{
+  "name": "riskmirror",
+  "version": "1.0.0",
+  "description": "> A full-stack web application that analyzes your financial data and generates a personalized risk profile, categorized as **Low Risk**, **Moderate Risk**, or **High Risk**.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "express": "^5.2.1"
+  }
+}
