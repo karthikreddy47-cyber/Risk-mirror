@@ -38,17 +38,18 @@ router.post('/assess', authMiddleware, [
     has_life_insurance: req.body.has_life_insurance === true || req.body.has_life_insurance === 'true',
   };
 
-  const conn = await pool.getConnection();
+  const client = await pool.connect();
   try {
-    await conn.beginTransaction();
+    await client.query('BEGIN');
 
     // Save financial profile
-    const [profileResult] = await conn.execute(
+    const profileResult = await client.query(
       `INSERT INTO financial_profiles 
         (user_id, monthly_income, monthly_expenses, monthly_savings, total_debt, monthly_emi,
          emergency_fund, investment_monthly, income_type, income_stability, dependents,
          has_health_insurance, has_life_insurance)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+       RETURNING id`,
       [
         req.user.id,
         profileData.monthly_income,
@@ -66,18 +67,19 @@ router.post('/assess', authMiddleware, [
       ]
     );
 
-    const profileId = profileResult.insertId;
+    const profileId = profileResult.rows[0].id;
 
     // Run risk engine
     const riskResult = calculateRisk(profileData);
 
     // Save risk assessment
-    const [assessmentResult] = await conn.execute(
+    const assessmentResult = await client.query(
       `INSERT INTO risk_assessments 
         (user_id, profile_id, risk_category, overall_score, savings_ratio,
          debt_to_income_ratio, expense_ratio, emi_to_income_ratio,
          emergency_fund_months, investment_ratio, risk_factors, recommendations)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+       RETURNING id`,
       [
         req.user.id,
         profileId,
@@ -94,24 +96,24 @@ router.post('/assess', authMiddleware, [
       ]
     );
 
-    await conn.commit();
+    await client.query('COMMIT');
 
     res.status(201).json({
       success: true,
       message: 'Risk assessment completed',
       assessment: {
-        id: assessmentResult.insertId,
+        id: assessmentResult.rows[0].id,
         profile_id: profileId,
         ...riskResult,
         input: profileData,
       },
     });
   } catch (error) {
-    await conn.rollback();
+    await client.query('ROLLBACK');
     console.error('Assessment error:', error);
     res.status(500).json({ success: false, message: 'Error processing risk assessment' });
   } finally {
-    conn.release();
+    client.release();
   }
 });
 
@@ -119,7 +121,7 @@ router.post('/assess', authMiddleware, [
 router.get('/history', authMiddleware, async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 10;
-    const [assessments] = await pool.execute(
+    const assessments = await pool.query(
       `SELECT ra.id, ra.risk_category, ra.overall_score, ra.savings_ratio,
               ra.debt_to_income_ratio, ra.expense_ratio, ra.emi_to_income_ratio,
               ra.emergency_fund_months, ra.investment_ratio, ra.risk_factors,
@@ -130,13 +132,13 @@ router.get('/history', authMiddleware, async (req, res) => {
               fp.has_health_insurance, fp.has_life_insurance
        FROM risk_assessments ra
        JOIN financial_profiles fp ON ra.profile_id = fp.id
-       WHERE ra.user_id = ?
+       WHERE ra.user_id = $1
        ORDER BY ra.created_at DESC
-       LIMIT ?`,
+       LIMIT $2`,
       [req.user.id, limit]
     );
 
-    const parsed = assessments.map(a => ({
+    const parsed = assessments.rows.map(a => ({
       ...a,
       risk_factors: typeof a.risk_factors === 'string' ? JSON.parse(a.risk_factors) : a.risk_factors,
       recommendations: typeof a.recommendations === 'string' ? JSON.parse(a.recommendations) : a.recommendations,

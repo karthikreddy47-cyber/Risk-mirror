@@ -13,21 +13,21 @@ const analyzeRisk = async (req, res) => {
     const userId = req.user.id;
 
     // Fetch latest assessment and profile data
-    const [assessments] = await pool.execute(
+    const result = await pool.query(
       `SELECT ra.*, fp.* FROM risk_assessments ra
        JOIN financial_profiles fp ON ra.profile_id = fp.id
-       WHERE ra.user_id = ? ORDER BY ra.created_at DESC LIMIT 1`,
+       WHERE ra.user_id = $1 ORDER BY ra.created_at DESC LIMIT 1`,
       [userId]
     );
 
-    if (assessments.length === 0) {
+    if (result.rows.length === 0) {
       return res.status(404).json({
         success: false,
         message: 'No assessment found. Please complete an assessment first.',
       });
     }
 
-    const assessment = assessments[0];
+    const assessment = result.rows[0];
 
     // Prepare profile data for analysis
     const profileData = {
@@ -93,21 +93,21 @@ const chatWithAI = async (req, res) => {
     }
 
     // Fetch latest assessment
-    const [assessments] = await pool.execute(
+    const result = await pool.query(
       `SELECT ra.overall_score, fp.* FROM risk_assessments ra
        JOIN financial_profiles fp ON ra.profile_id = fp.id
-       WHERE ra.user_id = ? ORDER BY ra.created_at DESC LIMIT 1`,
+       WHERE ra.user_id = $1 ORDER BY ra.created_at DESC LIMIT 1`,
       [userId]
     );
 
-    if (assessments.length === 0) {
+    if (result.rows.length === 0) {
       return res.status(404).json({
         success: false,
         message: 'No assessment found. Please complete an assessment first.',
       });
     }
 
-    const assessment = assessments[0];
+    const assessment = result.rows[0];
 
     // Prepare profile data
     const profileData = {
@@ -156,21 +156,21 @@ const getQuickInsights = async (req, res) => {
     const { analyzeRulesOnly } = require('../services/aiService');
 
     // Fetch latest assessment
-    const [assessments] = await pool.execute(
+    const result = await pool.query(
       `SELECT fp.* FROM risk_assessments ra
        JOIN financial_profiles fp ON ra.profile_id = fp.id
-       WHERE ra.user_id = ? ORDER BY ra.created_at DESC LIMIT 1`,
+       WHERE ra.user_id = $1 ORDER BY ra.created_at DESC LIMIT 1`,
       [userId]
     );
 
-    if (assessments.length === 0) {
+    if (result.rows.length === 0) {
       return res.status(404).json({
         success: false,
         message: 'No assessment found.',
       });
     }
 
-    const profileData = assessments[0];
+    const profileData = result.rows[0];
 
     // Generate rule-based insights (fast, no AI)
     const riskFactors = analyzeRulesOnly(profileData);

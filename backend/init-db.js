@@ -1,16 +1,23 @@
-const mysql = require('mysql2/promise');
+const { Client } = require('pg');
 const fs = require('fs');
 const path = require('path');
+require('dotenv').config();
 
 const initializeDatabase = async () => {
-  const connection = await mysql.createConnection({
+  const client = new Client({
     host: process.env.DB_HOST || 'localhost',
-    port: process.env.DB_PORT || 3306,
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || 'root',
+    port: process.env.DB_PORT || 5432,
+    user: process.env.DB_USER || 'postgres',
+    password: process.env.DB_PASSWORD || 'password',
+    database: process.env.DB_NAME || 'riskmirror',
+    ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
   });
 
   try {
+    console.log('🔧 Connecting to PostgreSQL database...');
+    await client.connect();
+    console.log('✅ Connected to PostgreSQL');
+    
     console.log('🔧 Initializing database schema...');
     
     const schemaPath = path.join(__dirname, '../database/schema.sql');
@@ -20,15 +27,25 @@ const initializeDatabase = async () => {
     const statements = schema.split(';').filter(stmt => stmt.trim());
     
     for (const statement of statements) {
-      await connection.query(statement);
+      try {
+        await client.query(statement);
+      } catch (err) {
+        // Ignore "already exists" errors for idempotency
+        if (!err.message.includes('already exists')) {
+          throw err;
+        }
+        console.log(`⚠️  ${err.message}`);
+      }
     }
     
     console.log('✅ Database schema initialized successfully!');
-    await connection.end();
+    await client.end();
     process.exit(0);
   } catch (error) {
     console.error('❌ Error initializing database:', error.message);
-    await connection.end();
+    try {
+      await client.end();
+    } catch (e) {}
     process.exit(1);
   }
 };

@@ -21,19 +21,19 @@ router.post('/register', [
   const { name, email, password } = req.body;
 
   try {
-    const [existing] = await pool.execute('SELECT id FROM users WHERE email = ?', [email]);
-    if (existing.length > 0) {
+    const existing = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+    if (existing.rows.length > 0) {
       return res.status(409).json({ success: false, message: 'Email already registered' });
     }
 
     const hashedPassword = await bcrypt.hash(password, 12);
-    const [result] = await pool.execute(
-      'INSERT INTO users (name, email, password) VALUES (?, ?, ?)',
+    const result = await pool.query(
+      'INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING id',
       [name, email, hashedPassword]
     );
 
     const token = jwt.sign(
-      { id: result.insertId, email, name },
+      { id: result.rows[0].id, email, name },
       process.env.JWT_SECRET || 'riskmirror_secret',
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
     );
@@ -42,7 +42,7 @@ router.post('/register', [
       success: true,
       message: 'Account created successfully',
       token,
-      user: { id: result.insertId, name, email },
+      user: { id: result.rows[0].id, name, email },
     });
   } catch (error) {
     console.error('Register error:', error);
@@ -63,12 +63,12 @@ router.post('/login', [
   const { email, password } = req.body;
 
   try {
-    const [users] = await pool.execute('SELECT * FROM users WHERE email = ?', [email]);
-    if (users.length === 0) {
+    const users = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+    if (users.rows.length === 0) {
       return res.status(401).json({ success: false, message: 'Invalid email or password' });
     }
 
-    const user = users[0];
+    const user = users.rows[0];
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(401).json({ success: false, message: 'Invalid email or password' });
@@ -95,11 +95,11 @@ router.post('/login', [
 // GET /api/auth/me
 router.get('/me', authMiddleware, async (req, res) => {
   try {
-    const [users] = await pool.execute('SELECT id, name, email, created_at FROM users WHERE id = ?', [req.user.id]);
-    if (users.length === 0) {
+    const users = await pool.query('SELECT id, name, email, created_at FROM users WHERE id = $1', [req.user.id]);
+    if (users.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
-    res.json({ success: true, user: users[0] });
+    res.json({ success: true, user: users.rows[0] });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error' });
   }

@@ -1,22 +1,24 @@
--- RiskMirror Database Schema
+-- RiskMirror Database Schema (PostgreSQL)
 -- Run this file to initialize the database
 
-CREATE DATABASE IF NOT EXISTS riskmirror;
-USE riskmirror;
+-- Create ENUM types for PostgreSQL
+CREATE TYPE income_type_enum AS ENUM ('salaried', 'self-employed', 'business', 'freelance', 'retired');
+CREATE TYPE income_stability_enum AS ENUM ('very_stable', 'stable', 'moderate', 'unstable', 'very_unstable');
+CREATE TYPE risk_category_enum AS ENUM ('Low Risk', 'Moderate Risk', 'High Risk');
 
 -- Users table
 CREATE TABLE IF NOT EXISTS users (
-  id INT AUTO_INCREMENT PRIMARY KEY,
+  id SERIAL PRIMARY KEY,
   name VARCHAR(100) NOT NULL,
   email VARCHAR(150) UNIQUE NOT NULL,
   password VARCHAR(255) NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Financial profiles table
 CREATE TABLE IF NOT EXISTS financial_profiles (
-  id INT AUTO_INCREMENT PRIMARY KEY,
+  id SERIAL PRIMARY KEY,
   user_id INT NOT NULL,
   monthly_income DECIMAL(12,2) NOT NULL,
   monthly_expenses DECIMAL(12,2) NOT NULL,
@@ -25,8 +27,8 @@ CREATE TABLE IF NOT EXISTS financial_profiles (
   monthly_emi DECIMAL(12,2) NOT NULL DEFAULT 0,
   emergency_fund DECIMAL(12,2) NOT NULL DEFAULT 0,
   investment_monthly DECIMAL(12,2) NOT NULL DEFAULT 0,
-  income_type ENUM('salaried','self-employed','business','freelance','retired') NOT NULL DEFAULT 'salaried',
-  income_stability ENUM('very_stable','stable','moderate','unstable','very_unstable') NOT NULL DEFAULT 'stable',
+  income_type income_type_enum NOT NULL DEFAULT 'salaried',
+  income_stability income_stability_enum NOT NULL DEFAULT 'stable',
   dependents INT NOT NULL DEFAULT 0,
   has_health_insurance BOOLEAN DEFAULT FALSE,
   has_life_insurance BOOLEAN DEFAULT FALSE,
@@ -36,10 +38,10 @@ CREATE TABLE IF NOT EXISTS financial_profiles (
 
 -- Risk assessments table
 CREATE TABLE IF NOT EXISTS risk_assessments (
-  id INT AUTO_INCREMENT PRIMARY KEY,
+  id SERIAL PRIMARY KEY,
   user_id INT NOT NULL,
   profile_id INT NOT NULL,
-  risk_category ENUM('Low Risk','Moderate Risk','High Risk') NOT NULL,
+  risk_category risk_category_enum NOT NULL,
   overall_score DECIMAL(5,2) NOT NULL,
   savings_ratio DECIMAL(5,2),
   debt_to_income_ratio DECIMAL(5,2),
@@ -47,14 +49,14 @@ CREATE TABLE IF NOT EXISTS risk_assessments (
   emi_to_income_ratio DECIMAL(5,2),
   emergency_fund_months DECIMAL(5,2),
   investment_ratio DECIMAL(5,2),
-  risk_factors JSON,
-  recommendations JSON,
+  risk_factors JSONB,
+  recommendations JSONB,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   FOREIGN KEY (profile_id) REFERENCES financial_profiles(id) ON DELETE CASCADE
 );
 
 -- Indexes
-CREATE INDEX idx_financial_profiles_user_id ON financial_profiles(user_id);
-CREATE INDEX idx_risk_assessments_user_id ON risk_assessments(user_id);
-CREATE INDEX idx_risk_assessments_created_at ON risk_assessments(created_at);
+CREATE INDEX IF NOT EXISTS idx_financial_profiles_user_id ON financial_profiles(user_id);
+CREATE INDEX IF NOT EXISTS idx_risk_assessments_user_id ON risk_assessments(user_id);
+CREATE INDEX IF NOT EXISTS idx_risk_assessments_created_at ON risk_assessments(created_at);
